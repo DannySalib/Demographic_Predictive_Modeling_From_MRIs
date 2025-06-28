@@ -43,7 +43,7 @@ class AtlasHandler:
         )
 
         pfc_roi_indicies = self.__atlas_handler.get_pfc_roi_indicies()
-        # For each brain region, use a logical or to update the mask
+        # For each brain region, use a logical 'or' opperator to update the mask
         # update the mask at coord (x,y,z) to true if the current ROI at coord(x, y, z) > 50% probability 
         # The current ROI at coord (x,y,z) i.e the voxel has a value of 0–100.
         # the value indicates the likelihood (%) that the voxel belongs to a given ROI.

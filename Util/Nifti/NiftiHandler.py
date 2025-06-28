@@ -1,4 +1,5 @@
 import nibabel as nib 
+from nibabel import Nifti1Image
 from nilearn import datasets
 import matplotlib.pyplot as plt
 import sys 
@@ -7,55 +8,100 @@ import os
 sys.path.append(os.path.abspath('../'))
 from Util.Nifti.AtlasHandler import AtlasHandler
 import numpy as np
+from warnings import warn
+from nilearn.image import resample_to_img
+from nptyping import NDArray
 
 class NiftiHandler:
-    def __init__(self, path: str):
-        self._img = self.update_current_img(path)
-        self.__atlas_handler = AtlasHandler()
-        
-    @property
-    def img(self):
-        return self._img
+    def __init__(self, path: str = None):
+        self.img: Nifti1Image = None
+
+        if path:
+            self.update_current_img_with_path(path)
+
+        self._atlas_handler = AtlasHandler()
     
     @property
     def atlas_handler(self):
-        return self.__atlas_handler
+        return self._atlas_handler
     
-    @img.setter
-    def img(self, path: str):
-        self.update_current_img(path)
-
     # TODO mask the pfc_mask onto the current img 
     # TODO test and see results 
     # TODO explore img smoothing methods, or what other further processing is needed before creating a dataset for a model 
     # TODO generalize methods to process data for all parts of the brain not just PFC
-    def get_pfc_img_data(self) -> np.array:
+    def get_pfc_img(self) -> Nifti1Image:
         if not self.is_normalized():
             self.normalize()
+
+        pfc_mask = self.atlas_handler.get_pfc_mask()
+
+        # happens when applying a 2mm resolution mask to a 1mm resolution image
+        if self.img.shape != pfc_mask.shape:
+            pfc_mask = self.resample_mask_shape(pfc_mask)
         
-        return 
+        # float32 since apparently were still tight on memory in this day and age
+        img_data = self.img.get_fdata(dtype=np.float32) 
+        pfc_mask_data = pfc_mask.get_fdata(dtype=np.float32)
+        pfc_mask_data = pfc_mask_data.astype(np.bool_)
+
+        # Apply the binary PFC mask
+        img_data_masked = img_data * pfc_mask_data
+
+        return Nifti1Image(
+            img_data_masked,
+            affine = self.img.affine,
+            header = self.img.header
+        )
     
-    def is_normalized(self):
-        atlas_img = self.__atlas_handler.get_img()
+    def resample_mask_shape(self, mask: np.array) -> NDArray:
+        return resample_to_img(
+            mask, 
+            self.img, 
+            interpolation='nearest'
+        )
+
+    def is_normalized(self) -> bool:
+        atlas_img = self._atlas_handler.get_img()
         return np.allclose(atlas_img.affine, atlas_img.affine, atol=1e-2)
 
-    def normalize(self):
-        return 
+    def normalize(self) -> None:
+        #mni_data = resample_to_img(your_mri_img, atlas_img, interpolation='continuous')
+        # something like that 
+        raise NotImplementedError()
 
-    def update_current_img(self, path: str):
+    def update_current_img_with_path(self, path: str) -> None:
         try:
-            self._img = nib.load(path)
+            self.img = nib.load(path)
         except Exception as e:
             raise Exception(f'Error loading nifti file: {e}')
 
-    def plot_img(self, nrows: int = 5, ncols: int = 5):
+    def show_img(self, nrows: int = 5, ncols: int = 5, ROI_index: int = None) -> None:
+        n_limit = 2
+        if nrows < n_limit:
+            raise Exception(f'nrows must be greater than {n_limit}')
+        if ncols < n_limit:
+            raise Exception(f'ncols must be greater than {n_limit}')
+        
         fig, axis = plt.subplots(
             nrows = nrows,
             ncols = ncols,
             figsize = (10, 10)
         )
 
-        img_data = self._img.get_fdata()
+        img_data = self.img.get_fdata()
+
+        # I want to be able to graph atlas `Nifti1Image`s
+        dimension = len(img_data.shape)
+        if dimension == 3 and ROI_index is not None:
+            warn('show_img: Cannot use ROI_index on 3D img...')
+        if dimension == 4:
+            if ROI_index:
+                img_data = img_data[..., ROI_index]
+            else:
+                raise Exception(f'Cannot graph 4D img with undefined ROI_index')
+        elif dimension > 4:
+            raise Exception(f'Cannot graph img with {dimension = }')
+        
         zMax = img_data.shape[2]
         step = zMax // (nrows*ncols) # n^2 = total number of slices we're graphing 
 
@@ -72,7 +118,8 @@ class NiftiHandler:
                 axis[i][j].axis('off')
 
                 current_slice += step
-        
-        return fig
+    
+    def __str__(self):
+        return str(self.img)
     
 

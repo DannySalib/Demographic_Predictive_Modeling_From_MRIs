@@ -25,32 +25,28 @@ class NiftiHandler:
     def img(self, path: str):
         self.update_current_img(path)
 
+    # TODO mask the pfc_mask onto the current img 
+    # TODO test and see results 
+    # TODO explore img smoothing methods, or what other further processing is needed before creating a dataset for a model 
+    # TODO generalize methods to process data for all parts of the brain not just PFC
+    def get_pfc_img_data(self) -> np.array:
+        if not self.is_normalized():
+            self.normalize()
+        
+        return 
+    
+    def is_normalized(self):
+        atlas_img = self.__atlas_handler.get_img()
+        return np.allclose(atlas_img.affine, atlas_img.affine, atol=1e-2)
+
+    def normalize(self):
+        return 
+
     def update_current_img(self, path: str):
         try:
             self._img = nib.load(path)
         except Exception as e:
             raise Exception(f'Error loading nifti file: {e}')
-
-    def get_pfc_img_data(self):
-        atlas_img = self.__atlas_handler.atlas.maps
-        atlas_img_data = atlas_img.get_fdata()
-
-        # Set a mask of all 0s with the same 3D shape
-        pfc_img_data = np.zeros(
-            shape = atlas_img.shape[:3],
-            dtype=bool
-        )
-
-        pfc_roi_indicies = self.__atlas_handler.get_pfc_roi_indicies()
-        # For each brain region, use a logical or to update the mask
-        # update the mask at coord (x,y,z) to true if the current ROI at coord(x, y, z) > 50% probability 
-        # The current ROI at coord (x,y,z) i.e the voxel has a value of 0–100.
-        # the value indicates the likelihood (%) that the voxel belongs to a given ROI.
-        for roi_idx in pfc_roi_indicies:
-            roi_prob = atlas_img_data[..., roi_idx]
-            pfc_img_data |= (roi_prob >= 50)
-
-        return pfc_img_data
 
     def plot_img(self, nrows: int = 5, ncols: int = 5):
         fig, axis = plt.subplots(

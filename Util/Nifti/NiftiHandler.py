@@ -25,27 +25,25 @@ class NiftiHandler:
     def atlas_handler(self):
         return self._atlas_handler
     
-    # TODO mask the pfc_mask onto the current img 
-    # TODO test and see results 
     # TODO explore img smoothing methods, or what other further processing is needed before creating a dataset for a model 
     # TODO generalize methods to process data for all parts of the brain not just PFC
-    def get_pfc_img(self) -> Nifti1Image:
-        if not self.is_normalized():
-            self.normalize()
+    def get_roi_img(self, roi: str) -> Nifti1Image:
+        if not self.is_affine_normalized():
+            self.normalize_by_affine()
+        
+        mask = self.atlas_handler.get_roi_mask(roi)
 
-        pfc_mask = self.atlas_handler.get_pfc_mask()
-
-        # happens when applying a 2mm resolution mask to a 1mm resolution image
-        if self.img.shape != pfc_mask.shape:
-            pfc_mask = self.resample_mask_shape(pfc_mask)
+        # error happens when applying a 2mm resolution mask to a 1mm resolution image
+        if self.img.shape != mask.shape:
+            mask = self.resample_mask_shape(mask)
         
         # float32 since apparently were still tight on memory in this day and age
         img_data = self.img.get_fdata(dtype=np.float32) 
-        pfc_mask_data = pfc_mask.get_fdata(dtype=np.float32)
-        pfc_mask_data = pfc_mask_data.astype(np.bool_)
+        mask_data = mask.get_fdata(dtype=np.float32)
+        mask_data = mask_data.astype(np.bool_)
 
         # Apply the binary PFC mask
-        img_data_masked = img_data * pfc_mask_data
+        img_data_masked = img_data * mask_data
 
         return Nifti1Image(
             img_data_masked,
@@ -60,11 +58,11 @@ class NiftiHandler:
             interpolation='nearest'
         )
 
-    def is_normalized(self) -> bool:
+    def is_affine_normalized(self) -> bool:
         atlas_img = self._atlas_handler.get_img()
         return np.allclose(atlas_img.affine, atlas_img.affine, atol=1e-2)
 
-    def normalize(self) -> None:
+    def normalize_by_affine(self) -> None:
         #mni_data = resample_to_img(your_mri_img, atlas_img, interpolation='continuous')
         # something like that 
         raise NotImplementedError()

@@ -1,62 +1,71 @@
 import nibabel as nib
+from nibabel import Nifti1Image
 from nilearn import datasets
 import numpy as np
-from nptyping import NDArray
-
+from itertools import chain
 class AtlasHandler:
     def __init__(self):
         self.__atlas  = datasets.fetch_atlas_harvard_oxford('cort-prob-2mm')
-        self.__atlas_label_to_index = {label : i for i, label in enumerate(self.__atlas.labels[1:])} # skip i=0 (background)
+        self.__roi_to_atlas_index_dict = self.__create_roi_to_atlas_index_dict()
 
+    def __create_roi_to_atlas_index_dict(self) -> dict[str, int]:
+        labels = self.__atlas.labels[1:] # skip i=0 (background)
+        # init roi -> index with labels 
+        roi_to_indicies = {label : [i] for i, label in enumerate(labels)}
+
+        # define other brain regions 
+        roi_to_indicies['Prefrontal Cortex'] = list(chain(
+            roi_to_indicies['Frontal Pole'],
+            roi_to_indicies['Superior Frontal Gyrus'],
+            roi_to_indicies['Middle Frontal Gyrus'],
+            roi_to_indicies['Inferior Frontal Gyrus, pars triangularis'],
+            roi_to_indicies['Inferior Frontal Gyrus, pars opercularis'],
+            roi_to_indicies['Frontal Medial Cortex'],
+            roi_to_indicies['Paracingulate Gyrus'],
+            roi_to_indicies['Cingulate Gyrus, anterior division'],
+            roi_to_indicies['Frontal Orbital Cortex']
+        ))
+
+        return roi_to_indicies
+        
     @property
     def atlas(self):
         return self.__atlas
     
     @property
-    def atlas_label_to_index(self):
-        return self.__atlas_label_to_index
+    def roi_to_atlas_index_dict(self):
+        return self.__roi_to_atlas_index_dict
     
-    def get_img(self) -> nib.Nifti1Image:
+    def get_img(self) -> Nifti1Image:
         return self.__atlas.maps
     
-    def get_pfc_roi_indicies(self) -> list:
-        return [
-            self.__atlas_label_to_index['Frontal Pole'],
-            self.__atlas_label_to_index['Superior Frontal Gyrus'],
-            self.__atlas_label_to_index['Middle Frontal Gyrus'],
-            self.__atlas_label_to_index['Inferior Frontal Gyrus, pars triangularis'],
-            self.__atlas_label_to_index['Inferior Frontal Gyrus, pars opercularis'],
-            self.__atlas_label_to_index['Frontal Medial Cortex'],
-            self.__atlas_label_to_index['Paracingulate Gyrus'],
-            self.__atlas_label_to_index['Cingulate Gyrus, anterior division'],
-            self.__atlas_label_to_index['Frontal Orbital Cortex']
-        ]
-    
-    def get_pfc_mask(self) -> nib.Nifti1Image:
+    def get_roi_mask(self, roi: str) -> Nifti1Image:
+        roi_indicies = self.__roi_to_atlas_index_dict.get(roi)
+
+        if not roi_indicies:
+            raise Exception(f'Unrecognized region of interest: {roi}')
+        
         atlas_img = self.__atlas.maps
         atlas_img_data = atlas_img.get_fdata()
 
         # Set a mask of all 0s with the same 3D shape
-        pfc_mask_fdata = np.zeros(
+        mask_fdata = np.zeros(
             shape = atlas_img.shape[:3],
             dtype=np.uint8
         )
 
-        pfc_roi_indicies = self.get_pfc_roi_indicies()
         # For each brain region, use a logical 'or' opperator to update the mask
         # update the mask at coord (x,y,z) to true if the current ROI at coord(x, y, z) > 50% probability 
         # The current ROI at coord (x,y,z) i.e the voxel has a value of 0–100.
         # the value indicates the likelihood (%) that the voxel belongs to a given ROI.
-        for roi_idx in pfc_roi_indicies:
+        for roi_idx in roi_indicies:
             roi_prob = atlas_img_data[..., roi_idx]
-            pfc_mask_fdata |= (roi_prob >= 50)
+            mask_fdata |= (roi_prob >= 50)
 
         # Return as NIfTI image with same affine and header as the atlas
         return nib.Nifti1Image(
-            pfc_mask_fdata.astype(np.uint8), 
+            mask_fdata.astype(np.uint8), 
             affine=atlas_img.affine, 
             header=atlas_img.header
         )
-
-    
-
+        

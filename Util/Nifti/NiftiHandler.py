@@ -1,5 +1,6 @@
 import nibabel as nib 
 from nibabel import Nifti1Image
+from nilearn.image import resample_to_img, index_img
 import matplotlib.pyplot as plt
 import sys 
 import os 
@@ -8,7 +9,6 @@ sys.path.append(os.path.abspath('../'))
 from Util.Nifti.AtlasHandler import AtlasHandler
 import numpy as np
 from warnings import warn
-from nilearn.image import resample_to_img
 from nptyping import NDArray
 
 # TODO major refactor needed:
@@ -16,16 +16,66 @@ from nptyping import NDArray
 #       4D data. How do we handle them accordingly?
 class NiftiHandler:
     def __init__(self, path: str = None):
-        self.img: Nifti1Image = None
-
-        if path:
-            self.update_current_img_with_path(path)
-
         self._atlas_handler = AtlasHandler()
+
+        self._img: Nifti1Image = None
+        self._img_dim: int = None
+        if path: # this defines self.img
+            self.update_current_img_with_path(path)
+            self.update()
     
+    def update(self):
+        self._img_dim = len(self._img.shape)
+
+        if not self.is_3D and not self.is_4D:
+            raise Exception(f'Cannot work with {self._img_dim}D data')
+
+        if self.is_4D:
+            self.correct_for_motion()
+
+    @property
+    def img(self):
+        return self._img
+    
+    @img.setter
+    def img(self, img: Nifti1Image):
+        self._img = img 
+        self.update()
+
     @property
     def atlas_handler(self):
         return self._atlas_handler
+    
+    @property
+    def img_dim(self):
+        return self.img_dim
+    
+    @property
+    def is_3D(self):
+        return self._img_dim == 3
+    
+    @property
+    def is_4D(self):
+        return self._img_dim == 4
+    
+    def correct_for_motion(self) -> None:
+        if not self.is_4D:
+            warn('This function is only needed for 4D fMRI data. Your dimension: {self._img_dim}\nreturning...')
+            return 
+        
+        img_data = self._img.get_fdata()
+        # Align all other MRIs @ t = t to MRI @ t = 0
+        refrence = img_data[..., 0]
+        # TODO cannot resample with fdata. instead, create a refrence nifti
+        # and then a nifti for each MRI @ time t
+        # resample 
+        # get fdata, and append it 
+        # at the end stack it with np.stack(motion_corrected, axis=-1)
+        # update current img with new one
+        motion_corrected = [resample_to_img(img_data[..., t], refrence) for t in range(self._img.shape[-1])]
+
+        self._img = Nifti1Image(motion_corrected, self._img.affine, self._img.header)
+
     
     def get_roi_img(self, roi: str) -> Nifti1Image:
         if not self.is_affine_normalized():
@@ -34,27 +84,44 @@ class NiftiHandler:
         mask = self.atlas_handler.get_roi_mask(roi)
 
         # error happens when applying a 2mm resolution mask to a 1mm resolution image
-        if self.img.shape != mask.shape:
+        if self._img.shape != mask.shape:
             mask = self.resample_mask_shape(mask)
         
         # float32 since apparently were still tight on memory in this day and age
-        img_data = self.img.get_fdata(dtype=np.float32) 
+        img_data = self._img.get_fdata(dtype=np.float32) 
         mask_data = mask.get_fdata(dtype=np.float32)
         mask_data = mask_data.astype(np.bool_)
+        
+        # Earlier we asserted that the dimension must either be 3D or 4D
+        if self.is_3D:
+            # Lets superficially add a new dimension such that 
+            # the masking below can be generalized for both 3D/4D
+            img_data = img_data[..., np.newaxis]
+        
+        masked_img_data = np.zeros_like(img_data, np.float_)
+        for t in range(img_data.shape[-1]):
+            # Apply the binary PFC mask
+            masked_img_data[..., t] = img_data[..., t] * mask_data
 
-        # Apply the binary PFC mask
-        img_data_masked = img_data * mask_data
+        # Change 3D from 4D back to 3D
+        if self.is_3D:
+            masked_img_data = masked_img_data[..., 0]
 
         return Nifti1Image(
-            img_data_masked,
-            affine = self.img.affine,
-            header = self.img.header
+            masked_img_data,
+            affine = self._img.affine,
+            header = self._img.header
         )
     
-    def resample_mask_shape(self, mask: np.array) -> NDArray:
+    def resample_mask_shape(self, mask: Nifti1Image) -> Nifti1Image:
+        if self.is_3D:
+            refrence = self._img
+        else: # must be 4D
+            refrence = index_img(self.img, 0)
+
         return resample_to_img(
             mask, 
-            self.img, 
+            refrence, 
             interpolation='nearest'
         )
 
@@ -69,7 +136,7 @@ class NiftiHandler:
 
     def update_current_img_with_path(self, path: str) -> None:
         try:
-            self.img = nib.load(path)
+            self._img = nib.load(path)
         except Exception as e:
             raise Exception(f'Error loading nifti file: {e}')
 
@@ -86,7 +153,7 @@ class NiftiHandler:
             figsize = (10, 10)
         )
 
-        img_data = self.img.get_fdata()
+        img_data = self._img.get_fdata()
 
         # I want to be able to graph atlas `Nifti1Image`s
         dimension = len(img_data.shape)
@@ -118,6 +185,6 @@ class NiftiHandler:
                 current_slice += step
     
     def __str__(self):
-        return str(self.img)
+        return str(self._img)
     
 

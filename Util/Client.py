@@ -12,7 +12,7 @@ ______________________________
 __DATA_SET_NAME = 'ds000228'
 __BUCKET = 'openneuro.org' # for s3 requests (bucket refers to the name of the website)
 __DATA_SET_URL = f'https://{__BUCKET}/datasets/{__DATA_SET_NAME}'
-__DATA_PATH = '../Data' # Create destination folder for data
+DATA_PATH = '../Data' # Create destination folder for data
 
 # To get an idea of the naming conventions, here is an example key you'd use to download a file from the dataset
 example_key = 'ds000228/sub-pixar001/anat/sub-pixar001_T1w.nii.gz'
@@ -49,12 +49,13 @@ __s3_client = boto3.client(
 
 
 @validate_key
-def download_file(key: str, the_file_name_you_want: str) -> str:
+def download_file(key: str, the_file_name_you_want: str, path: str = '.') -> str:
     '''
     Downloads file from https://openneuro.org/datasets/ds000228 and moves it to the Data directory
     Returns a str path describing file path
     '''
-    output_path = f'{__DATA_PATH}/{the_file_name_you_want}'
+    os.makedirs(path, exist_ok=True)
+    output_path = f'{path}/{the_file_name_you_want}'
     __s3_client.download_file(
         Bucket= __BUCKET,
         Key=key,  # Use the exact path from list_objects_v2

@@ -1,6 +1,5 @@
 import nibabel as nib 
 from nibabel import Nifti1Image
-from nilearn import datasets
 import matplotlib.pyplot as plt
 import sys 
 import os 
@@ -12,6 +11,9 @@ from warnings import warn
 from nilearn.image import resample_to_img
 from nptyping import NDArray
 
+# TODO major refactor needed:
+#   - The TASK data is the data we need to train on. this is 
+#       4D data. How do we handle them accordingly?
 class NiftiHandler:
     def __init__(self, path: str = None):
         self.img: Nifti1Image = None
@@ -25,8 +27,6 @@ class NiftiHandler:
     def atlas_handler(self):
         return self._atlas_handler
     
-    # TODO explore img smoothing methods, or what other further processing is needed before creating a dataset for a model 
-    # TODO generalize methods to process data for all parts of the brain not just PFC
     def get_roi_img(self, roi: str) -> Nifti1Image:
         if not self.is_affine_normalized():
             self.normalize_by_affine()

@@ -11,22 +11,42 @@ class AtlasHandler:
     def __create_roi_to_atlas_index_dict(self) -> dict[str, int]:
         labels = self.__atlas.labels[1:] # skip i=0 (background)
         # init roi -> index with labels 
-        roi_to_indicies = {label : [i] for i, label in enumerate(labels)}
+        roi_to_indices = {label : [i] for i, label in enumerate(labels)}
 
         # define other brain regions 
-        roi_to_indicies['Prefrontal Cortex'] = list(chain(
-            roi_to_indicies['Frontal Pole'],
-            roi_to_indicies['Superior Frontal Gyrus'],
-            roi_to_indicies['Middle Frontal Gyrus'],
-            roi_to_indicies['Inferior Frontal Gyrus, pars triangularis'],
-            roi_to_indicies['Inferior Frontal Gyrus, pars opercularis'],
-            roi_to_indicies['Frontal Medial Cortex'],
-            roi_to_indicies['Paracingulate Gyrus'],
-            roi_to_indicies['Cingulate Gyrus, anterior division'],
-            roi_to_indicies['Frontal Orbital Cortex']
+        roi_to_indices['Prefrontal Cortex'] = list(chain(
+            roi_to_indices['Frontal Pole'],
+            roi_to_indices['Superior Frontal Gyrus'],
+            roi_to_indices['Middle Frontal Gyrus'],
+            roi_to_indices['Inferior Frontal Gyrus, pars triangularis'],
+            roi_to_indices['Inferior Frontal Gyrus, pars opercularis'],
+            roi_to_indices['Frontal Medial Cortex'],
+            roi_to_indices['Paracingulate Gyrus'],
+            roi_to_indices['Cingulate Gyrus, anterior division'],
+            roi_to_indices['Frontal Orbital Cortex']
         ))
 
-        return roi_to_indicies
+        roi_to_indices['Temporal Lobe'] = list(chain(
+            roi_to_indices['Temporal Pole'],
+            roi_to_indices['Superior Temporal Gyrus, anterior division'],
+            roi_to_indices['Superior Temporal Gyrus, posterior division'],
+            roi_to_indices['Middle Temporal Gyrus, anterior division'],
+            roi_to_indices['Middle Temporal Gyrus, posterior division'],
+            roi_to_indices['Middle Temporal Gyrus, temporooccipital part'],
+            roi_to_indices['Inferior Temporal Gyrus, anterior division'],
+            roi_to_indices['Inferior Temporal Gyrus, posterior division'],
+            roi_to_indices['Inferior Temporal Gyrus, temporooccipital part'],
+            roi_to_indices['Parahippocampal Gyrus, anterior division'],
+            roi_to_indices['Parahippocampal Gyrus, posterior division'],
+            roi_to_indices['Temporal Fusiform Cortex, anterior division'],
+            roi_to_indices['Temporal Fusiform Cortex, posterior division'],
+            roi_to_indices['Temporal Occipital Fusiform Cortex'],
+            roi_to_indices['Planum Polare'],
+            roi_to_indices["Heschl's Gyrus (includes H1 and H2)"],
+            roi_to_indices['Planum Temporale']
+        ))
+
+        return roi_to_indices
         
     @property
     def atlas(self):

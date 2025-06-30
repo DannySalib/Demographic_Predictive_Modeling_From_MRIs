@@ -15,23 +15,20 @@ from nptyping import NDArray
 #   - The TASK data is the data we need to train on. this is 
 #       4D data. How do we handle them accordingly?
 class NiftiHandler:
-    def __init__(self, path: str = None):
+    def __init__(self, img: Nifti1Image = None):
         self._atlas_handler = AtlasHandler()
 
         self._img: Nifti1Image = None
         self._img_dim: int = None
-        if path: # this defines self.img
-            self.update_current_img_with_path(path)
-            self.update()
+        if img: # this defines self.img
+            self.update(img)
     
-    def update(self):
+    def update(self, img: Nifti1Image) -> None:
+        self._img = img
         self._img_dim = len(self._img.shape)
 
         if not self.is_3D and not self.is_4D:
             raise Exception(f'Cannot work with {self._img_dim}D data')
-
-        if self.is_4D:
-            self.correct_for_motion()
 
     @property
     def img(self):
@@ -39,8 +36,7 @@ class NiftiHandler:
     
     @img.setter
     def img(self, img: Nifti1Image):
-        self._img = img 
-        self.update()
+        self.update(img)
 
     @property
     def atlas_handler(self):
@@ -63,19 +59,16 @@ class NiftiHandler:
             warn('This function is only needed for 4D fMRI data. Your dimension: {self._img_dim}\nreturning...')
             return 
         
-        img_data = self._img.get_fdata()
+        motion_corrected = []
         # Align all other MRIs @ t = t to MRI @ t = 0
-        refrence = img_data[..., 0]
-        # TODO cannot resample with fdata. instead, create a refrence nifti
-        # and then a nifti for each MRI @ time t
-        # resample 
-        # get fdata, and append it 
-        # at the end stack it with np.stack(motion_corrected, axis=-1)
-        # update current img with new one
-        motion_corrected = [resample_to_img(img_data[..., t], refrence) for t in range(self._img.shape[-1])]
+        refrence_img = index_img(self._img, 0)
+        for t in range(self._img.shape[-1]):
+            curr_img = index_img(self._img, t)
+            corrected = resample_to_img(curr_img, refrence_img)
+            motion_corrected.append(corrected.get_fdata())
 
+        motion_corrected = np.stack(motion_corrected, axis=-1)
         self._img = Nifti1Image(motion_corrected, self._img.affine, self._img.header)
-
     
     def get_roi_img(self, roi: str) -> Nifti1Image:
         if not self.is_affine_normalized():
@@ -134,13 +127,7 @@ class NiftiHandler:
         # something like that 
         raise NotImplementedError()
 
-    def update_current_img_with_path(self, path: str) -> None:
-        try:
-            self._img = nib.load(path)
-        except Exception as e:
-            raise Exception(f'Error loading nifti file: {e}')
-
-    def show_img(self, nrows: int = 5, ncols: int = 5, ROI_index: int = None) -> None:
+    def show_img(self, nrows: int = 5, ncols: int = 5, time: int = None) -> None:
         n_limit = 2
         if nrows < n_limit:
             raise Exception(f'nrows must be greater than {n_limit}')
@@ -156,16 +143,15 @@ class NiftiHandler:
         img_data = self._img.get_fdata()
 
         # I want to be able to graph atlas `Nifti1Image`s
-        dimension = len(img_data.shape)
-        if dimension == 3 and ROI_index is not None:
+        time_defined = time is not None
+        if self.is_3D and time_defined:
             warn('show_img: Cannot use ROI_index on 3D img...')
-        if dimension == 4:
-            if ROI_index:
-                img_data = img_data[..., ROI_index]
+
+        if self.is_4D:
+            if time_defined:
+                img_data = img_data[..., time]
             else:
                 raise Exception(f'Cannot graph 4D img with undefined ROI_index')
-        elif dimension > 4:
-            raise Exception(f'Cannot graph img with {dimension = }')
         
         zMax = img_data.shape[2]
         step = zMax // (nrows*ncols) # n^2 = total number of slices we're graphing 

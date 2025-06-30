@@ -35,7 +35,7 @@ def main():
         anat_name = f'{anat_path}/{participant_id}.nii.gz'
         Client.download_file(anat_key, anat_name)
 
-        func_key = f'ds000228/{participant_id}/anat/{participant_id}_T1w.nii.gz'
+        func_key = f'ds000228/{participant_id}/func/{participant_id}_task-pixar_bold.nii.gz'
         func_name = f'{func_path}/{participant_id}.nii.gz'
         Client.download_file(func_key, func_name)
 

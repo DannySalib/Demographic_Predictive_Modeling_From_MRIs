@@ -1,0 +1,1 @@
+python3 ./run_model_report.py >> report.md

@@ -1,18 +1,17 @@
-import nibabel as nib 
+import nibabel as nib
 from nibabel import Nifti1Image
 from nilearn.image import resample_to_img, index_img
 import matplotlib.pyplot as plt
-import sys 
-import os 
+import sys
+import os
 # Add the project root to sys.path
 sys.path.append(os.path.abspath('../'))
 from Util.Nifti.AtlasHandler import AtlasHandler
 import numpy as np
 from warnings import warn
-from nptyping import NDArray
 
 # TODO major refactor needed:
-#   - The TASK data is the data we need to train on. this is 
+#   - The TASK data is the data we need to train on. this is
 #       4D data. How do we handle them accordingly?
 class NiftiHandler:
     def __init__(self, img: Nifti1Image = None):
@@ -22,7 +21,7 @@ class NiftiHandler:
         self._img_dim: int = None
         if img: # this defines self.img
             self.update(img)
-    
+
     def update(self, img: Nifti1Image) -> None:
         self._img = img
         self._img_dim = len(self._img.shape)
@@ -33,7 +32,7 @@ class NiftiHandler:
     @property
     def img(self):
         return self._img
-    
+
     @img.setter
     def img(self, img: Nifti1Image):
         self.update(img)
@@ -41,24 +40,24 @@ class NiftiHandler:
     @property
     def atlas_handler(self):
         return self._atlas_handler
-    
+
     @property
     def img_dim(self):
         return self.img_dim
-    
+
     @property
     def is_3D(self):
         return self._img_dim == 3
-    
+
     @property
     def is_4D(self):
         return self._img_dim == 4
-    
+
     def correct_for_motion(self) -> None:
         if not self.is_4D:
             warn('This function is only needed for 4D fMRI data. Your dimension: {self._img_dim}\nreturning...')
-            return 
-        
+            return
+
         motion_corrected = []
         # Align all other MRIs @ t = t to MRI @ t = 0
         refrence_img = index_img(self._img, 0)
@@ -69,29 +68,29 @@ class NiftiHandler:
 
         motion_corrected = np.stack(motion_corrected, axis=-1)
         self._img = Nifti1Image(motion_corrected, self._img.affine, self._img.header)
-    
+
     def get_roi_img(self, roi: str) -> Nifti1Image:
         if not self.is_affine_normalized():
             self.normalize_by_affine()
-        
+
         mask = self.atlas_handler.get_roi_mask(roi)
 
         # error happens when applying a 2mm resolution mask to a 1mm resolution image
         if self._img.shape != mask.shape:
             mask = self.resample_mask_shape(mask)
-        
+
         # float32 since apparently were still tight on memory in this day and age
-        img_data = self._img.get_fdata(dtype=np.float32) 
+        img_data = self._img.get_fdata(dtype=np.float32)
         mask_data = mask.get_fdata(dtype=np.float32)
         mask_data = mask_data.astype(np.bool_)
-        
+
         # Earlier we asserted that the dimension must either be 3D or 4D
         if self.is_3D:
-            # Lets superficially add a new dimension such that 
+            # Lets superficially add a new dimension such that
             # the masking below can be generalized for both 3D/4D
             img_data = img_data[..., np.newaxis]
-        
-        masked_img_data = np.zeros_like(img_data, np.float_)
+
+        masked_img_data = np.zeros_like(img_data, np.float64)
         for t in range(img_data.shape[-1]):
             # Apply the binary PFC mask
             masked_img_data[..., t] = img_data[..., t] * mask_data
@@ -105,7 +104,7 @@ class NiftiHandler:
             affine = self._img.affine,
             header = self._img.header
         )
-    
+
     def resample_mask_shape(self, mask: Nifti1Image) -> Nifti1Image:
         if self.is_3D:
             refrence = self._img
@@ -113,8 +112,8 @@ class NiftiHandler:
             refrence = index_img(self.img, 0)
 
         return resample_to_img(
-            mask, 
-            refrence, 
+            mask,
+            refrence,
             interpolation='nearest'
         )
 
@@ -124,7 +123,7 @@ class NiftiHandler:
 
     def normalize_by_affine(self) -> None:
         #mni_data = resample_to_img(your_mri_img, atlas_img, interpolation='continuous')
-        # something like that 
+        # something like that
         raise NotImplementedError()
 
     def show_img(self, nrows: int = 5, ncols: int = 5, time: int = None) -> None:
@@ -133,7 +132,7 @@ class NiftiHandler:
             raise Exception(f'nrows must be greater than {n_limit}')
         if ncols < n_limit:
             raise Exception(f'ncols must be greater than {n_limit}')
-        
+
         fig, axis = plt.subplots(
             nrows = nrows,
             ncols = ncols,
@@ -152,9 +151,9 @@ class NiftiHandler:
                 img_data = img_data[..., time]
             else:
                 raise Exception(f'Cannot graph 4D img with undefined ROI_index')
-        
+
         zMax = img_data.shape[2]
-        step = zMax // (nrows*ncols) # n^2 = total number of slices we're graphing 
+        step = zMax // (nrows*ncols) # n^2 = total number of slices we're graphing
 
         current_slice = 0 # index of current slice from the MRI scan
         # for each axis ...
@@ -169,8 +168,8 @@ class NiftiHandler:
                 axis[i][j].axis('off')
 
                 current_slice += step
-    
+
     def __str__(self):
         return str(self._img)
-    
+
 

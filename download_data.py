@@ -1,33 +1,50 @@
+"""
+Danny Salib
+07/11/2025
+download_data.py = accesses opennuero.org's ds000228 dataset and downloads it
+Python 3.11.9
+
+"""
+import os
 import pandas as pd
-import sys 
-import os 
-# Add the project root to sys.path
-sys.path.append(os.path.abspath('../'))
-import Util.Client as Client
 from tqdm import tqdm
+import Util.client as Client
 
-def main():
-    # Create data folder 
-    data_path = './Data'
-    os.makedirs(data_path, exist_ok=True)
+__DATA_PATH= './Data'
 
-    # Add anat data folder. this is where the patient's base brain state goes 
-    anat_path = f'{data_path}/anat'
+@lambda _:_() # its a solo project so i get to do wacky shi like this
+def data_path() -> str:
+    '''read only'''
+    return __DATA_PATH
+
+def download_data():
+    """
+    Iterates through each patient id to get func and anat data
+    """
+    # Create data folder
+    os.makedirs(__DATA_PATH, exist_ok=True)
+
+    # Add anat data folder. this is where the patient's base brain state goes
+    anat_path = f'{__DATA_PATH}/anat'
     os.makedirs(anat_path, exist_ok=True)
 
-    # add func data folder. this is where the patients's brain activity during task goes 
-    func_path = f'{data_path}/func'
+    # add func data folder. this is where the patients's brain activity during task goes
+    func_path = f'{__DATA_PATH}/func'
     os.makedirs(func_path, exist_ok=True)
 
-    # get the particpants data frame 
+    # get the particpants data frame
     participants_df_key = 'ds000228/participants.tsv'
-    participants_df_path = f'{data_path}/participants.tsv'
+    participants_df_path = f'{__DATA_PATH}/participants.tsv'
     Client.download_file(
         key = participants_df_key,
         the_file_name_you_want = participants_df_path
     )
 
-    participants_df = pd.read_csv(participants_df_path, sep='\t')
+    try:
+        participants_df = pd.read_csv(participants_df_path, sep='\t')
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f'Could not download file: {participants_df_key}') from e
+
 
     for participant_id in tqdm(participants_df['participant_id'], desc='Collecting Data'):
 
@@ -40,4 +57,4 @@ def main():
         Client.download_file(func_key, func_name)
 
 if __name__ == '__main__':
-    main()
+    download_data()

@@ -1,44 +1,35 @@
+"""
+Danny Salib
+07/11/2025
+client.py = handles boto3 client to get all relevent data for this project
+Python 3.11.9
+"""
+
+import os
 import boto3
 from botocore import UNSIGNED
 from botocore.client import Config
-import shutil 
-import os 
 
-'''
-Constants and Helper Functions
-______________________________
-'''
+########################## Constants and Helper Functions
 # Info on the data set
 __DATA_SET_NAME = 'ds000228'
 __BUCKET = 'openneuro.org' # for s3 requests (bucket refers to the name of the website)
 __DATA_SET_URL = f'https://{__BUCKET}/datasets/{__DATA_SET_NAME}'
-DATA_PATH = '../Data' # Create destination folder for data
+__DATA_PATH = '../Data' # Create destination folder for data
 
-# To get an idea of the naming conventions, here is an example key you'd use to download a file from the dataset
-example_key = 'ds000228/sub-pixar001/anat/sub-pixar001_T1w.nii.gz'
-example_file_name = 'sub-pixar001_T1w.nii.gz'
+@lambda _:_() # i get to do wacky shit like this cuz its a solo project
+def data_path() -> str:
+    '''read only kinda lke python's  @property built in'''
+    return __DATA_PATH
 
-# Validates the key when making requests to openneuro.org 
-is_valid_key = lambda key: key.startswith('ds000228') # lazy checking 
-def validate_key(func):
-    def wrapper(*args, **kwargs):
-        key = kwargs.get('key')
-        
-        if key and not is_valid_key(key):
-            raise Exception(
-                f'Please select a file from {__DATA_SET_URL}\n'
-                f'Example key: \"{example_key}\"'
-            )
-        
-        return func(*args, **kwargs)
+# To get an idea of the naming conventions,
+#   here is an example key you'd use to download a file from the dataset
+EXAMPLE_KEY = 'ds000228/sub-pixar001/anat/sub-pixar001_T1w.nii.gz'
+EXAMPLE_FILE_NAME = 'sub-pixar001_T1w.nii.gz'
 
-    return wrapper
+################# Downloading Data
 
-'''
-Downloading Data
-________________
-'''
-# Set up s3 client 
+# Set up s3 client
 __s3_client = boto3.client(
     's3',
     endpoint_url='https://s3.amazonaws.com',
@@ -47,8 +38,6 @@ __s3_client = boto3.client(
         )
 )
 
-
-@validate_key
 def download_file(key: str, the_file_name_you_want: str, path: str = '.') -> str:
     '''
     Downloads file from https://openneuro.org/datasets/ds000228 and moves it to the Data directory
@@ -63,5 +52,3 @@ def download_file(key: str, the_file_name_you_want: str, path: str = '.') -> str
     )
 
     return f'Downloaded to {output_path}'
-
-

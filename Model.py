@@ -79,6 +79,7 @@ class Model:
         Yields:
             Generator: yield of ROI data
         """
+        # TODO to reduce filler 0s (background voxels) get the ROI mask and use to to drop uneeded 0s
         n_workers = n_workers or min(MIN_PROCESSOR_CORES, cpu_count() - 1)
         with Pool(n_workers) as pool:
             all_roi_data = pool.starmap(

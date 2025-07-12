@@ -92,7 +92,6 @@ def run_report():
     logger.info('Making training data...')
 
     df = df.sample(frac=1) # shuffle df
-    #split_idx = len(df) * 2 // 3 # split 2/3 training & 1/3
     Y = df['Age']
     training_data = [] # A 5D array. will need to use PCA (principle component analysis)
     nifti_handler = NiftiHandler()
@@ -122,8 +121,9 @@ def run_report():
     pca = PCA(n_components=50)
     training_data = pca.fit_transform(training_data)
 
-    print(training_data)
     logger.info(training_data)
+
+
 
 
     logger.info('finished')

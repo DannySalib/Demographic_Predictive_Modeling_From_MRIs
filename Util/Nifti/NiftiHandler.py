@@ -93,9 +93,8 @@ class NiftiHandler:
         masked_img_data = np.zeros_like(img_data, np.float64)
         for t in range(img_data.shape[-1]):
             # Apply the binary PFC mask
-            masked_img_data[..., t] = img_data[..., t] * mask_data
+            masked_img_data[..., t] = img_data[..., t][mask_data]
 
-        # Change 3D from 4D back to 3D
         if self.is_3D:
             masked_img_data = masked_img_data[..., 0]
 

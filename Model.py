@@ -2,30 +2,19 @@ import os
 import warnings
 import numpy as np
 import pandas as pd
-from Util.Nifti.NiftiHandler import NiftiHandler
-from Util.Nifti.AtlasHandler import AtlasHandler
+from Util.MRIFunc import MRIFunc
 
 import nibabel as nib
 from multiprocessing import Pool, cpu_count
 from typing import Generator
+from Util.Atlas import Atlas
 
 PFC_ROI_STR: str = 'Prefrontal Cortex'
 MIN_PROCESSOR_CORES: int = 4
 class Model:
     def __init__(self, participants_df: pd.DataFrame):
         self.participants_df = participants_df
-        self._nifti_handler = NiftiHandler()
-        self._atlas_handler = AtlasHandler()
-
-    @property
-    def nifti_handler(self) -> NiftiHandler:
-        '''read only'''
-        return self._nifti_handler
-
-    @property
-    def atlas_handler(self) -> AtlasHandler:
-        '''read only'''
-        return self._atlas_handler
+        self.atlas = Atlas()
 
     def shuffled_df(self, random_state: int = 42) -> pd.DataFrame:
         """Shuffles dataframe with a random seed"""
@@ -52,7 +41,7 @@ class Model:
         split_idx = self.get_split_idx()
         return data.iloc[:split_idx], data.iloc[split_idx:]
 
-    def _load_single_roi(self, patient_id: str, ROI: str, mask_img_3d: nib.Nifti1Image) -> np.array:
+    def _load_single_roi(self, patient_id: str, roi: str) -> np.array:
         """Try to load the patients ROI
 
         Args:
@@ -62,17 +51,21 @@ class Model:
         Returns:
             np.array | None: img data if successfull. None otherwise
         """
+
+        # TODO bad way of determining img_path
         img_path = f'../Data/func/{patient_id}.nii.gz'
 
-        self.nifti_handler.img = nib.load(img_path)
-        roi_img_4d = self.nifti_handler.get_roi_img(ROI)
+        img = nib.load(img_path)
+        fMRI = MRIFunc(img.dataobj, img.affine, img.header)
+        fMRI_roi_data: np.ndarray = fMRI.get_roi_fdata(roi, preserve_shape=True)
 
-        roi_img_4d_data = roi_img_4d.get_fdata()
-        *_, nt = roi_img_4d.shape
+        # remove z-slices that are all 0s
+        # TODO
+        
+        nt = fMRI_roi_data.shape[-1]
+        return fMRI_roi_data.reshape(shape=(nt, -1))
 
-        return roi_img_4d_data.reshape(nt, -1) #(t, x*y*z)
-
-    def _load_rois(self, patient_ids: pd.Index, ROI: str,  n_workers: int = None) -> Generator:
+    def _load_rois(self, patient_ids: pd.Index, roi: str,  n_workers: int = None) -> Generator:
         """Load the ROI of each patient in parallel and yield each patient ROI
 
         Args:
@@ -83,13 +76,11 @@ class Model:
         Yields:
             Generator: yield of ROI data
         """
-        # TODO to reduce filler 0s (background voxels) get the ROI mask and use to to drop uneeded 0s
-        mask_img_3d = self.atlas_handler.get_roi_mask(ROI)
         n_workers = n_workers or min(MIN_PROCESSOR_CORES, cpu_count() - 1)
         with Pool(n_workers) as pool:
             all_roi_data = pool.starmap(
                 self._load_single_roi,
-                [(pid, ROI, mask_img_3d) for pid in patient_ids]
+                [(pid, roi) for pid in patient_ids]
             )
 
             for roi_data in all_roi_data:
@@ -111,13 +102,13 @@ class Model:
 
         x_tr_gen = self._load_rois(
             patient_ids = y_tr.index,
-            ROI = ROI,
+            roi = ROI,
             n_workers = n_workers
         )
 
         x_v_gen = self._load_rois(
             patient_ids = y_v.index,
-            ROI = ROI,
+            roi = ROI,
             n_workers = n_workers
         )
 

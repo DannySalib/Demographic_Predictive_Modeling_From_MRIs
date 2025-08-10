@@ -16,7 +16,7 @@ from sklearn.utils import resample
 import nibabel as nib
 from tqdm import tqdm
 from Util.Nifti.NiftiHandler import NiftiHandler
-from download_data import  data_path, download_data
+from helper_funcs.download_data import  data_path, download_data
 
 warnings.filterwarnings('ignore')
 

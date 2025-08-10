@@ -1,32 +1,30 @@
 
 import numpy as np
-from nibabel import Nifti1Image
 from nilearn.image import resample_to_img, index_img
-from Util.MRI import MRI
-from Util.MRIDimension import MRIDimension
-from Util.MRI3D import MRI3D
+from MRI_objs.abstract import MRI
+from MRI_objs.enums import Dimension
 
 class MRI4D(MRI):
     def __init__(self, dataobj, affine, header=None, extra=None, file_map=None, dtype=None):
         super().__init__(dataobj, affine, header, extra, file_map, dtype)
 
-#        if len(self.shape) != MRIDimension.FOUR_D.value:
+#        if len(self.shape) != Dimension.FOUR_D.value:
 #            raise ValueError(f'Cannot inititalize MRI 4D non 4D data shape: {self.shape}')
-    
-    ######## Mandatory abstract methods 
+
+    ######## Mandatory abstract methods
     @property
-    def dimension(self) -> MRIDimension:
-        return MRIDimension.FOUR_D
-    
+    def dimension(self) -> Dimension:
+        return Dimension.FOUR_D
+
     def resample(self, refrence: 'MRI3D') -> 'MRI4D':
         """Updates fdata cache with resampled fdata
 
         Args:
-            refrence (MRI): img to resample to 
+            refrence (MRI): img to resample to
             interpolation (str, optional): Interpolaiton type. Defaults to 'continuous'.
         """
         refrence_dimension = len(refrence.shape)
-        assert refrence_dimension == MRIDimension.THREE_D.value
+        assert refrence_dimension == Dimension.THREE_D.value
 
         resampled_shape = refrence.shape + (self.nt,)
         resampled = np.zeros(resampled_shape, dtype=self.get_data_dtype())
@@ -34,7 +32,7 @@ class MRI4D(MRI):
         for t in range(self.nt):
             curr_img = index_img(self, t)
             curr_img_corrected = resample_to_img(curr_img, refrence)
-            
+
             resampled[..., t] = curr_img_corrected.get_fdata()
 
         return MRI4D(
@@ -42,9 +40,9 @@ class MRI4D(MRI):
             affine=self.affine,
             header=self.header
         )
-    
+
     def correct_for_motion(self) -> None:
-        """Functional MRI data needs to account for head motion 
+        """Functional MRI data needs to account for head motion
 
         Returns:
             Self: 4D MRI
@@ -52,12 +50,12 @@ class MRI4D(MRI):
         self.resample(
             refrence = index_img(self, index=0)
         )
- 
-    ##### Unique methods to a 4D MRI 
+
+    ##### Unique methods to a 4D MRI
     @property
     def nt(self) -> int:
         return self.shape[-1]
-    
+
     def get_tsnr(self):
         '''temporal signal-to-noise ratio'''
         data = self.get_fdata()
@@ -66,6 +64,7 @@ class MRI4D(MRI):
         try:
             tsnr = np.mean(data, -1) / np.std(data, -1)
         except ZeroDivisionError:
-            pass # return as none 
-        
+            # todo log?
+            pass # return as none
+
         return tsnr

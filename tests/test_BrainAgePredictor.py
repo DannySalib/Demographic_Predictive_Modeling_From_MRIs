@@ -1,5 +1,5 @@
 import unittest
-from Model_objs.BrainAgePredictor import BrainAgePredictor
+from objs_Model import BrainAgePredictor
 from helper_funcs import get_participants_df
 
 class TestBrainAgePredictor(unittest.TestCase):

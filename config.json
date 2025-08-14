@@ -1,0 +1,24 @@
+
+{
+    "roi" : {
+        "types" : [
+            "None",
+            "PFC"
+        ],
+        "descriptions" : {
+            "None" : "Run model on all brain activity",
+            "PFC": "Prefrontal Cortex"
+        },
+        "default" : "PFC"
+    },
+
+    "predictor" : {
+        "types": [
+            "BRAIN_AGE"
+        ],
+        "descriptions" : {
+            "BRAIN_AGE" : "Linear regression model that predicts age from brain activity"
+        },
+        "default" : "BRAIN_AGE"
+    }
+}
